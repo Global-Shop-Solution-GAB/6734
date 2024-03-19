@@ -1,0 +1,304 @@
+﻿Program.Sub.ScreenSU.Start
+Gui.FormComm..Create
+Gui.FormComm..Caption("Commission Rate By SalesPerson, Customer and Part")
+Gui.FormComm..Size(6960,9090)
+Gui.FormComm..MinX(0)
+Gui.FormComm..MinY(0)
+Gui.FormComm..Position(0,0)
+Gui.FormComm..BackColor(-2147483633)
+Gui.FormComm..MousePointer(0)
+Gui.FormComm..Event(UnLoad,FormComm_UnLoad)
+Gui.FormComm.lblCustomer.Create(Label,"Customer",True,975,255,0,120,165,True,0,"Arial",8,-2147483633,0)
+Gui.FormComm.txtCust.Create(TextBox,"",True,1215,300,0,120,405,True,0,"Arial",8,-2147483643,1)
+Gui.FormComm.txtCust.Locked(True)
+Gui.FormComm.lblName.Create(Label,"Customer Name",True,1935,255,0,1515,165,True,0,"Arial",8,-2147483633,0)
+Gui.FormComm.txtCustName.Create(TextBox,"",True,3000,300,0,1515,405,True,0,"Arial",8,-2147483643,1)
+Gui.FormComm.txtCustName.Locked(True)
+Gui.FormComm.lblName2.Create(Label,"Default Commission Rate",True,1935,255,0,4695,165,True,0,"Arial",8,-2147483633,0)
+Gui.FormComm.txtRate.Create(TextBox,"",True,1215,300,0,4695,405,True,0,"Arial",8,-2147483643,1)
+Gui.FormComm.txtRate.Locked(True)
+Gui.FormComm.cmdCommRate.Create(Button)
+Gui.FormComm.cmdCommRate.Size(480,375)
+Gui.FormComm.cmdCommRate.Position(6105,360)
+Gui.FormComm.cmdCommRate.Caption("^")
+Gui.FormComm.cmdCommRate.Event(Click,cmdCommRate_Click)
+Gui.FormComm.lblPart.Create(Label,"Part",True,975,255,0,120,945,True,0,"Arial",8,-2147483633,0)
+Gui.FormComm.txtPart.Create(TextBox,"",True,2025,300,0,120,1200,True,0,"Arial",8,-2147483643,1)
+Gui.FormComm.txtPart.Locked(True)
+Gui.FormComm.lblDesc.Create(Label,"Description",True,1095,255,0,2430,945,True,0,"Arial",8,-2147483633,0)
+Gui.FormComm.txtDesc.Create(TextBox,"",True,4065,300,0,2430,1185,True,0,"Arial",8,-2147483643,1)
+Gui.FormComm.txtDesc.Locked(True)
+Gui.FormComm.GsGridRate.Create(GsGridControl)
+Gui.FormComm.GsGridRate.Size(6540,6315)
+Gui.FormComm.GsGridRate.Position(120,1710)
+Gui.FormComm.GsGridRate.Anchor(15)
+Gui.FormComm.cmdSave.Create(Button)
+Gui.FormComm.cmdSave.Size(855,375)
+Gui.FormComm.cmdSave.Position(120,8145)
+Gui.FormComm.cmdSave.Anchor(6)
+Gui.FormComm.cmdSave.Caption("Save")
+Gui.FormComm.cmdSave.Event(Click,cmdSave_Click)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+V.Global.bOpen.Declare(Boolean,False)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String,"")
+
+F.Intrinsic.Control.CallSub(Get_Data)
+F.Intrinsic.Control.CallSub(Set_Prop)
+
+Gui.FormComm..Show
+Gui.FormComm..AlwaysOnTop(True)
+Gui.FormComm..AlwaysOnTop(False)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	F.Intrinsic.String.Build("Project: GCG_6734_SP_PART_COMMISSION.g2u {0}{0}Subroutine: {1}{0}Error Occurred {2} with description {3}",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(FormComm_UnLoad)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Main.End
+
+Program.Sub.cmdCommRate_Click.Start
+F.Intrinsic.Control.SetErrorHandler("cmdCommRate_Click_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String,"")
+V.Local.sRet.Declare(String)
+V.Local.sSql.Declare(String,"")
+V.Local.sTitles.Declare(String,"")
+V.Local.sWidths.Declare(String,"")
+
+F.Intrinsic.UI.SetBrowserHotTypeAhead(True)
+
+F.Intrinsic.Control.If(V.Global.bOpen,=,False)
+	F.ODBC.Connection!Con.OpenCompanyConnection
+	V.Global.bOpen.Set(True)
+F.Intrinsic.Control.EndIf
+
+V.Local.sSql.Set("Select Cust_No, Name_Customer, Part_No, Description, Comm_Rate From Commission_Cp a Left Join V_Customer_Master b on a.Cust_No = b.Customer Left Join V_Inventory_Mstr c on a.Part_No = c.Part Order by Cust_No,Part_No")
+
+V.Local.sTitles.Set("Customer*!*Name*!*Part*!*Description*!*Rate")
+V.Local.sWidths.Set("1800*!*1800*!*1800*!*1800*!*1800")
+
+F.Intrinsic.String.Split(V.Local.sTitles,"*!*",V.Local.sTitles)
+F.Intrinsic.String.Split(V.Local.sWidths,"*!*",V.Local.sWidths)
+
+F.Intrinsic.UI.Browser("Select Customer/Part","con",V.Local.sSql,V.Local.sTitles,V.Local.sWidths,10200,8700,V.Local.sRet)
+
+F.Intrinsic.Control.If(V.Global.bOpen)
+	F.ODBC.Connection!Con.Close
+	V.Global.bOpen.Set(False)
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.If(V.Local.sRet,<>,"***CANCEL***")
+	F.Intrinsic.String.Split(V.Local.sRet,"*!*",V.Local.sRet)
+	Gui.FormComm.txtCust.Text(V.Local.sRet(0).Trim)
+	Gui.FormComm.txtCustName.Text(V.Local.sRet(1).Trim)
+	Gui.FormComm.txtPart.Text(V.Local.sRet(2).Trim)
+	Gui.FormComm.txtDesc.Text(V.Local.sRet(3).Trim)
+	Gui.FormComm.txtRate.Text(V.Local.sRet(4).Float)
+	F.Intrinsic.Control.BlockEvents
+	F.Intrinsic.Control.CallSub(Get_Data)
+	F.Intrinsic.Control.UnBlockEvents
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("cmdCommRate_Click_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	F.Intrinsic.String.Build("Project: GCG_6734_SP_PART_COMMISSION.g2u {0}{0}Subroutine: {1}{0}Error Occurred {2} with description {3}",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(FormComm_UnLoad)
+Function.Intrinsic.Control.EndIf
+Program.Sub.cmdCommRate_Click.End
+
+Program.Sub.FormComm_UnLoad.Start
+F.Intrinsic.Control.SetErrorHandler("FormComm_UnLoad_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String,"")
+
+F.Intrinsic.Control.If(V.Global.bOpen)
+	F.ODBC.Connection!Con.Close
+	V.Global.bOpen.Set(False)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("FormComm_UnLoad_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	F.Intrinsic.Control.End
+Function.Intrinsic.Control.EndIf
+Program.Sub.FormComm_UnLoad.End
+
+Program.Sub.cmdSave_Click.Start
+F.Intrinsic.Control.SetErrorHandler("cmdSave_Click_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String,"")
+V.Local.sSql.Declare(String,"")
+
+F.Data.DataView.Create("Rate","Temp",22,"Rate not is null","")
+
+F.Data.DataView.ToDataTable("Rate","Temp","RateSave",True)
+
+F.Intrinsic.Control.If(V.Global.bOpen,=,False)
+	F.ODBC.Connection!Con.OpenCompanyConnection
+	V.Global.bOpen.Set(True)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("Delete From GCG_6734_SP_PRT_COMM Where Part = '{0}' and Customer = '{1}'",V.Screen.FormComm!txtPart.Text,V.Screen.FormComm!txtCust.Text,V.Local.sSql)
+F.ODBC.Connection!Con.Execute(V.Local.sSql)
+
+F.Intrinsic.Control.If(V.DataTable.RateSave.RowCount--,<>,-1)
+	F.Data.DataTable.SaveToDB("RateSave","con","GCG_6734_SP_PRT_COMM","",128,"Part@!@Part*!*Customer@!@Customer*!*SP_ID@!@SP_ID*!*RATE@!@RATE")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.Global.bOpen)
+F.ODBC.Connection!Con.Close
+	V.Global.bOpen.Set(False)
+F.Intrinsic.Control.EndIf
+
+F.Data.DataTable.Close("RateSave")
+F.Intrinsic.UI.Msgbox("Data Saved....")
+
+F.Data.DataView.Close("Rate","Temp")
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("cmdSave_Click_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	F.Intrinsic.String.Build("Project: GCG_6734_SP_PART_COMMISSION.g2u {0}{0}Subroutine: {1}{0}Error Occurred {2} with description {3}",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(FormComm_UnLoad)
+Function.Intrinsic.Control.EndIf
+Program.Sub.cmdSave_Click.End
+
+Program.Sub.Get_Data.Start
+F.Intrinsic.Control.SetErrorHandler("Get_Data_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String,"")
+V.Local.sSql.Declare(String,"")
+
+F.Intrinsic.Control.If(V.Global.bOpen,=,False)
+	F.ODBC.Connection!Con.OpenCompanyConnection
+	V.Global.bOpen.Set(True)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.DataTable.Rate.Exists)
+	V.Local.sSql.Set("Select ID as SP_ID, rtrim(Name) as Name, cast(null as Double) as Rate From SALESPERSONS")
+	F.Data.DataTable.CreateFromSQL("Temp","con",V.Local.sSql,True)
+	F.Intrinsic.String.Build("Select SP_ID, Rate From GCG_6734_SP_PRT_COMM Where Part = '{0}' and Customer = '{1}'",V.Screen.FormComm!txtPart.Text,V.Screen.FormComm!txtCust.Text,V.Local.sSql)
+	F.Data.Dictionary.CreateFromSQL("DRate","con",V.Local.sSql)
+	F.Data.Dictionary.SetDefaultReturn("DRate",-1)
+	F.Data.DataTable.FillFromDictionary("Temp","DRate","SP_ID","Rate")
+	F.Data.Dictionary.Close("DRate")
+	F.Data.DataTable.DeleteRow("Rate")
+	F.Data.DataTable.AcceptChanges("Rate")
+	F.Data.DataTable.Merge("Temp","Rate",False,2)
+	F.Data.DataTable.Close("Temp")
+	F.Data.DataTable.SetValue("Rate",-1,"Part",V.Screen.FormComm!txtPart.Text,"Customer",V.Screen.FormComm!txtCust.Text)
+	F.Data.DataView.Create("Rate","Temp",22,"Rate = -1","")
+	F.Data.DataView.SetValue("Rate","Temp",-1,"Rate",V.Ambient.DBNULL)
+	F.Data.DataView.Close("Rate","Temp")
+F.Intrinsic.Control.Else
+	F.Data.DataTable.CreateFromSQL("Rate","con","Select Part, Customer, SP_ID, ' ' as NAME, Rate From GCG_6734_SP_PRT_COMM Where SP_ID = '-1'",True)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.Global.bOpen)
+	F.ODBC.Connection!Con.Close
+	V.Global.bOpen.Set(False)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Get_Data_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	F.Intrinsic.String.Build("Project: GCG_6734_SP_PART_COMMISSION.g2u {0}{0}Subroutine: {1}{0}Error Occurred {2} with description {3}",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(FormComm_UnLoad)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Get_Data.End
+
+Program.Sub.Set_Prop.Start
+F.Intrinsic.Control.SetErrorHandler("Set_Prop_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String,"")
+
+Gui.FormComm.GsGridRate.AddGridviewFromDatatable("GRate","Rate")
+Gui.FormComm.GsGridRate.SetGridviewProperty("GRate","OptionsViewColumnAutoWidth", True)
+Gui.FormComm.GsGridRate.SetGridviewProperty("GRate","AllowColumnMoving", False)
+
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Part","Caption","Part")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Part","Visible",False)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Part","HeaderForeColor",v.Color.PRI-GSS-00)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Part","HeaderFontBold",True)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Part","HeaderHAlignment","Near")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Part","CellHAlignment","Near")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Part","AllowEdit",False)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Part","ReadOnly",True)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Part","AllowShowHide",False)
+
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Customer","Caption","Customer")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Customer","Visible",False)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Customer","HeaderForeColor",v.Color.PRI-GSS-00)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Customer","HeaderFontBold",True)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Customer","HeaderHAlignment","Near")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Customer","CellHAlignment","Near")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Customer","AllowEdit",False)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Customer","ReadOnly",True)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Customer","AllowShowHide",False)
+
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","SP_ID","Caption","ID")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","SP_ID","HeaderForeColor",v.Color.PRI-GSS-00)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","SP_ID","HeaderFontBold",True)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","SP_ID","HeaderHAlignment","Near")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","SP_ID","CellHAlignment","Near")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","SP_ID","AllowEdit",False)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","SP_ID","ReadOnly",True)
+
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","NAME","Caption","Salesperson")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","NAME","HeaderForeColor",v.Color.PRI-GSS-00)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","NAME","HeaderFontBold",True)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","NAME","HeaderHAlignment","Near")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","NAME","CellHAlignment","Near")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","NAME","AllowEdit",False)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","NAME","ReadOnly",True)
+
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Rate","Caption","Rate")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Rate","HeaderForeColor",v.Color.PRI-GSS-00)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Rate","HeaderFontBold",True)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Rate","HeaderHAlignment","Near")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Rate","CellHAlignment","Near")
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Rate","AllowEdit",True)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Rate","ReadOnly",False)
+Gui.FormComm.GsGridRate.SetColumnProperty("GRate","Rate","DisplayCustomNumeric","#0.00")
+
+Gui.FormComm.GsGridRate.MainView("GRate")
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Set_Prop_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	F.Intrinsic.String.Build("Project: GCG_6734_SP_PART_COMMISSION.g2u {0}{0}Subroutine: {1}{0}Error Occurred {2} with description {3}",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(FormComm_UnLoad)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Set_Prop.End
+
+Program.Sub.Comments.Start
+${$5$}$2.0.0.0$}$2
+${$6$}$rking$}$20230223080125114$}$QNdZLVy4bWuiWa9jh1ZTiKHvMPldSPXe6RGy7ub4VL2f0sKDWk2NwNu4kEXz5DxnZXGQ/1tshrw=
+Program.Sub.Comments.End
