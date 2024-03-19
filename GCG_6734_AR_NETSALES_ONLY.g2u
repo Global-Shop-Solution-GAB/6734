@@ -1,0 +1,440 @@
+﻿Program.Sub.Preflight.Start
+V.Global.bOpen.Declare(Boolean,False)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String,"")
+V.Local.sSql.Declare(String,"")
+V.Local.sRet.Declare(String,"")
+V.Local.sOrder.Declare(String,"")
+
+F.Intrinsic.Control.SelectCase(V.Caller.Hook)
+	F.Intrinsic.Control.Case(16090)
+
+		F.Intrinsic.Control.If(V.Passed.009001,=,"000565")
+			F.Intrinsic.Control.CallSub(Update_BIData)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.Control.End
+		F.Intrinsic.Control.EndIf	
+
+	F.Intrinsic.Control.Case(11872)
+		F.Intrinsic.Control.If(V.Caller.Switches,=,"N")
+			'Order Passed.000003
+			'customer Passed.000006
+			F.ODBC.Connection!Con.OpenCompanyConnection
+			F.Intrinsic.String.LPad(V.Passed.000003,"0",7,V.Local.sOrder)
+			
+			F.Intrinsic.String.Build("Select rtrim(Salesperson) From V_Order_Header Where Order_No = '{0}'",V.Local.sOrder,V.Local.sSql)
+			F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+			
+			F.Intrinsic.String.Build("Select Distinct rtrim(SP_ID) From GCG_6734_SP_PRT_COMM Where Customer = '{0}' and rtrim(SP_ID) <> '{1}'",V.Passed.000006,V.Local.sRet,V.Local.sSql)
+			F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+			F.Intrinsic.String.Replace(V.Local.sRet,"#$#",",",V.Local.sRet)
+			
+			F.Intrinsic.String.Build("Update Order_Header Set User_4 = '{0}' Where Order_No = '{1}' and Record_No = '  A'",V.Local.sRet,V.Local.sOrder,V.Local.sSql)
+			F.ODBC.Connection!Con.Execute(V.Local.sSql)
+			F.ODBC.Connection!Con.Close
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.CaseElse
+		F.Intrinsic.Control.End
+
+F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	F.Intrinsic.String.Build("Project: GCG_6734_AR_NETSALES_ONLY.g2u {0}{0}Subroutine: {1}{0}Error Occurred {2} with description {3}",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(Exit)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Main.End
+
+Program.Sub.Exit.Start
+F.Intrinsic.Control.SetErrorHandler("Exit_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String,"")
+
+F.Intrinsic.Control.If(V.Global.bOpen)
+	V.Global.bOpen.Set(False)
+	F.ODBC.Connection!con.Close
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Exit_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	F.Intrinsic.Control.End
+Function.Intrinsic.Control.EndIf
+Program.Sub.Exit.End
+
+Program.Sub.Update_BIData.Start
+F.Intrinsic.Control.SetErrorHandler("Update_BIData_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String,"")
+V.Local.sSql.Declare(String,"")
+V.Local.i.Declare(Long,0)
+V.Local.iNewSeq.Declare(Long,0)
+V.Local.sFilter.Declare(String,"")
+V.Local.sRet.Declare(String,"")
+V.Local.fComPer.Declare(Float,0)
+V.Local.fComDol.Declare(Float,0)
+V.Local.sSP.Declare(String,"")
+V.Local.iSP.Declare(Long,0)
+V.Local.iOL.Declare(Long,0)
+V.Local.sName.Declare(String,"")
+V.Local.sSeq.Declare(String,"")
+V.Local.dStart.Declare(Date)
+V.Local.dEnd.Declare(Date)
+V.Local.sOrder.Declare(String,"")
+V.Local.fDiscAMt.Declare(Float,0)
+V.Local.fSales.Declare(Float,0)
+V.Local.sTemp.Declare(String,"")
+
+F.Intrinsic.UI.InvokeWaitDialog("Updating Report Data.............")
+
+V.Local.sSql.Set("Select a.Trmnl, a.RptID, a.Report, a.SalesMan, a.Invoice_Number, b.Part, a.Invoice_Date, a.Inv_Time, a.Sequence, a.Rec_Type, a.Order_Number, a.Cust_PO, a.WO_Num, a.WO_Suf, a.Salsm_Name, a.From_Date,")
+F.Intrinsic.String.Build("{0} a.Thru_Date, a.Cust_Num, a.Name, a.State, a.Inv_Tot, (b.Taxable_Tot_1+b.Taxable_Tot_2+b.Taxable_Tot_3+b.Taxable_Tot_4+b.Taxable_Tot_5+b.Taxable_Tot_6+b.Taxable_Tot_7+b.Taxable_Tot_8+b.Taxable_Tot_9+b.Taxable_Tot_10) as Sales_Tax, Cast(b.Freight_Per_Piece * b.Qty_Shipped as Decimal(10,4)) as Freight,",V.Local.sSql,V.Local.sSql)
+F.Intrinsic.String.Build("{0} IF(b.Commission_Type = '',b.Extension,0.00) as Other_NC, IF(b.Commission_Type <> '',b.Extension,0.00) as Sales, Cast(b.Cost*b.Qty_Shipped as Decimal(10,4)) as Cost, Cast(b.Extension-(b.Cost*b.Qty_Shipped) as Decimal(10,4)) as Profit, b.Margin as Percent, a.Comm_PCT, a.Comm_Dollars,",V.Local.sSql,V.Local.sSql)
+F.Intrinsic.String.Build("{0} a.Part_Nox, a.Comm_Rate, a.Comm_Rate, a.Comm_Amount, a.Sub_Inv_Tot, a.Sub_Sales_Tax, a.Sub_Freight, a.Sub_0ther_NC, a.Sub_Sales, a.Sub_Cost, a.Sub_Profit, a.Sub_Percent, a.Sub_Comm_PCT, a.Sub_OE_Mult_Comm, a.Sub_Comm_Dollars, a.Tot_Inv_Tot,",V.Local.sSql,V.Local.sSql)
+F.Intrinsic.String.Build("{0} a.Tot_Sales_Tax, a.Tot_Freight, a.Tot_Other_NC, a.Tot_Sales, a.Tot_Cost, a.Tot_Profit, a.Tot_Percent, a.Tot_Comm_Pct, a.Tot_Oe_Mult_Comm, a.Tot_Comm_Dollars, a.Orig_Ivc_No",V.Local.sSql,V.Local.sSql)
+F.Intrinsic.String.Build("{0} From BI_SALES_REP_COMM a Left Join V_Order_Hist_Line b on a.Invoice_Number = b.Invoice and a.Order_Number = b.Order_No where Trmnl = '{1}' and RptId = '{2}' and Rec_Type = '1' and Order_Line <> '8000' Order by Sequence",V.Local.sSql,V.Caller.Terminal,V.Passed.009001,V.Local.sSql)
+
+F.ODBC.Connection!Con.OpenCompanyConnection
+V.Global.bOpen.Set(True)
+F.Data.DataTable.CreateFromSQL("REP","con",V.Local.sSql,True)
+
+F.Intrinsic.Control.If(V.DataTable.REP.RowCount--,<>,-1)
+	F.Intrinsic.String.Build("Select Top 1 From_Date From V_BI_SALES_REP_COMM  Where Trmnl = '{0}' and RptId = '{1}' Order By SalesMan,Invoice_Number",V.Caller.Terminal,V.Passed.009001,V.Local.sSql)
+	F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.dStart)
+	F.Intrinsic.String.Build("Select Top 1 Thru_Date From V_BI_SALES_REP_COMM  Where Trmnl = '{0}' and RptId = '{1}' Order By SalesMan,Invoice_Number",V.Caller.Terminal,V.Passed.009001,V.Local.sSql)
+	F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.dEnd)
+F.Intrinsic.Control.Else
+	F.Intrinsic.UI.CloseWaitDialog
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+
+F.Data.DataView.Create("REP","Temp",22,"","")
+
+F.Data.DataView.SetFilter("REP","Temp","Rec_Type = '1' and Salesman <> ''")
+F.Data.DataTable.AddColumn("REP","TEMPSEQ",Long)
+
+F.Data.DataView.ToDataTable("REP","TEMP","TEMPREP",True)
+'F.Data.DataTable.Clone("TEMPREP","SAVEREP",True)
+F.Data.DataTable.CreateFromSQL("SAVEREP",con,"Select * From BI_SALES_REP_COMM  Where Trmnl = '-112'",True)
+F.Data.DataTable.AddColumn("SAVEREP","TEMPSEQ",Long)
+
+F.Intrinsic.Control.For(V.Local.i,0,V.DataTable.TEMPREP.RowCount--,1)
+	F.Intrinsic.String.Build("Select Top 1 Part From V_Inventory_Mstr Where Part = '{0}'",V.DataTable.TEMPREP(V.Local.i).Part!FieldValTrim,V.Local.sSql)
+	F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+	F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+		F.Intrinsic.String.Build("Sequence = '{0}' and SalesMan = '{1}' and Part = '{2}' and Order_Number = '{3}'",V.DataTable.TEMPREP(V.Local.i).Sequence!FieldValTrim,V.DataTable.TEMPREP(V.Local.i).SalesMan!FieldValTrim,V.DataTable.TEMPREP(V.Local.i).Part!FieldValTrim,V.DataTable.TEMPREP(V.Local.i).Order_Number!FieldValTrim,V.Local.sFilter)
+		F.Data.DataView.SetFilter("REP","Temp",V.Local.sFilter)
+		F.Data.DataView.ToDataTable("REP","TEMP","TEMPREP2",True)
+		F.Intrinsic.String.Build("Select Rate From GCG_6734_SP_PRT_COMM Where Part = '{0}' and Customer = '{1}' and SP_ID = '{2}'",V.DataTable.TEMPREP(V.Local.i).Part!FieldValTrim,V.DataTable.TEMPREP(V.Local.i).Cust_Num!FieldValTrim,V.DataTable.TEMPREP(V.Local.i).Salesman!FieldValTrim,V.Local.sSql)
+		F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+		F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+			'Sales
+			F.Intrinsic.Math.Mult(V.Local.sRet.Float,V.DataTable.TEMPREP(V.Local.i).Sales!FieldVal,V.Local.fComDol)
+'			F.Intrinsic.Math.Mult(V.Local.sRet.Float,100,V.Local.fComPer)
+			V.Local.fComPer.Set(V.Local.sRet.Float)
+			F.Data.DataTable.SetValue("TEMPREP2",-1,"SALESMAN",V.DataTable.TEMPREP(V.Local.i).SALESMAN!FieldValTrim,"Comm_Pct",V.Local.fComPer,"Comm_Dollars",V.Local.fComDol,"TEMPSEQ",V.Local.iNewSeq)
+			F.Intrinsic.Math.Add(V.Local.iNewSeq,1,V.Local.iNewSeq)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Build("Select Comm_Rate From Commission_Cp Where Part_No = '{0}' and Cust_No = '{1}'",V.DataTable.TEMPREP(V.Local.i).Part!FieldValTrim,V.DataTable.TEMPREP(V.Local.i).Cust_Num!FieldValTrim,V.Local.sSql)
+			F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+			F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+				F.Intrinsic.Math.Mult(V.Local.sRet.Float,V.DataTable.TEMPREP(V.Local.i).Sales!FieldVal,V.Local.fComDol)
+'				F.Intrinsic.Math.Mult(V.Local.sRet.Float,100,V.Local.fComPer)
+				V.Local.fComPer.Set(V.Local.sRet.Float)
+				F.Data.DataTable.SetValue("TEMPREP2",-1,"SALESMAN",V.DataTable.TEMPREP(V.Local.i).SALESMAN!FieldValTrim,"Comm_Pct",V.Local.fComPer,"Comm_Dollars",V.Local.fComDol,"TEMPSEQ",V.Local.iNewSeq)
+				F.Intrinsic.Math.Add(V.Local.iNewSeq,1,V.Local.iNewSeq)
+			F.Intrinsic.Control.Else
+				F.Intrinsic.Math.Mult(V.DataTable.TEMPREP(V.Local.i).Comm_Pct!FieldVal,.01,V.Local.fComPer)
+				F.Intrinsic.Math.Mult(V.Local.fComPer.Float,V.DataTable.TEMPREP(V.Local.i).Sales!FieldVal,V.Local.fComDol)
+				F.Data.DataTable.SetValue("TEMPREP2",-1,"SALESMAN",V.DataTable.TEMPREP(V.Local.i).SALESMAN!FieldValTrim,"Comm_Pct",V.Local.fComPer,"Comm_Dollars",V.Local.fComDol,"TEMPSEQ",V.Local.iNewSeq)
+				F.Intrinsic.Math.Add(V.Local.iNewSeq,1,V.Local.iNewSeq)
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.EndIf
+		F.Data.DataTable.Merge("TEMPREP2","SAVEREP",True,2)
+		F.Intrinsic.String.Build("Select SP_ID, Name, Rate From GCG_6734_SP_PRT_COMM a Left Join SALESPERSONS b on a.SP_ID = b.ID Where Part = '{0}' and Customer = '{1}' and SP_ID <> '{2}'",V.DataTable.TEMPREP(V.Local.i).Part!FieldValTrim,V.DataTable.TEMPREP(V.Local.i).Cust_Num!FieldValTrim,V.DataTable.TEMPREP(V.Local.i).Salesman!FieldValTrim,V.Local.sSql)
+		F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+		F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+			F.Intrinsic.String.Split(V.Local.sRet,"#$#",V.Local.sSP)
+			F.Intrinsic.Control.For(V.Local.iSP,0,V.Local.sSP.UBound,1)
+				F.Intrinsic.String.Split(V.Local.sSP(V.Local.iSP),"*!*",V.Local.sRet)
+				F.Intrinsic.Control.If(V.Local.sRet(2).Float,>,0)
+					F.Intrinsic.Math.Mult(V.Local.sRet(2).Float,V.DataTable.TEMPREP(V.Local.i).Sales!FieldVal,V.Local.fComDol)
+'					F.Intrinsic.Math.Mult(V.Local.sRet(2).Float,100,V.Local.fComPer)
+					V.Local.fComPer.Set(V.Local.sRet(2).Float)
+					F.Data.DataTable.SetValue("TEMPREP2",-1,"SALESMAN",V.Local.sRet(0).Trim,"SALSM_NAME",V.Local.sRet(1).Trim,"Comm_Pct",V.Local.fComPer,"Comm_Dollars",V.Local.fComDol,"TEMPSEQ",V.Local.iNewSeq)
+					F.Data.DataTable.Merge("TEMPREP2","SAVEREP",True,2)
+					F.Intrinsic.Math.Add(V.Local.iNewSeq,1,V.Local.iNewSeq)
+				F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.Next(V.Local.iSP)
+		F.Intrinsic.Control.EndIf
+		F.Data.DataTable.Close("TEMPREP2")
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Next(V.Local.i)
+
+F.Data.DataTable.Close("TEMPREP")
+
+'F.Intrinsic.String.Build("Select Invoice_No, Cust, Cust_Name, Order_Num, Order_Seq, (Select (Terms_Disc_Pct * .01) as Disc_Per From GL_AR_Detail b Join V_AR_Terms c on b.Terms_Code = c.Terms_Code where a.Invoice_No = b.Invoice_No and a.Order_Num =  b.Order_Num and a.Order_Seq = b.Order_Seq and b.Tran_Type = '10' and b.Retain = '0') as Disc_Per From GL_AR_DETAIL a Where Post_Date_Sql between '{0}' and '{1}' and Tran_Type = '16' and Retain = '0'",V.Local.dStart.PervasiveDate,V.Local.dEnd.PervasiveDate,V.Local.sSql)
+F.Intrinsic.String.Build("Select Invoice_No, Cust, Cust_Name, Order_Num, Order_Seq, (c.Terms_Disc_Pct * .01) as Disc_Per From GL_AR_Detail b Join V_AR_Terms c on b.Terms_Code = c.Terms_Code where b.Tran_Type = '10' and b.Retain = '0' and Invoice_NO In(Select Invoice_No From GL_AR_DETAIL a Where a.Post_Date_Sql between '{0}' and '{1}' and a.Tran_Type = '16' and Retain = '0')",V.Local.dStart.PervasiveDate,V.Local.dEnd.PervasiveDate,V.Local.sSql)
+
+F.Data.DataTable.Create("TempDisc",True)
+F.Data.DataTable.AddColumn("TempDisc","Customer",String)
+F.Data.DataTable.AddColumn("TempDisc","Name",String)
+F.Data.DataTable.AddColumn("TempDisc","SP",String)
+F.Data.DataTable.AddColumn("TempDisc","SP_Name",String)
+F.Data.DataTable.AddColumn("TempDisc","Disc_Amt",Float)
+F.Data.DataTable.AddColumn("TempDisc","Disc_Comm",Float) 
+
+'adding in Discounts as Rec Type 1 with Discount 
+F.Data.DataTable.CreateFromSQL("ARDETAIL",con,V.Local.sSql,True)
+F.Intrinsic.Control.For(V.Local.i,0,V.DataTable.ARDETAIL.RowCount--,1)
+	F.Intrinsic.String.LPad(V.DataTable.ARDETAIL(V.Local.i).Order_Num!FieldValTrim,"0",7,V.Local.sOrder)
+	F.Intrinsic.String.Build("Select Salesman, b.Commission_Type, Order_Line, Part, a.Customer, a.Customer_PO, (Extension * {2}) as Disc_Amt From V_Order_Hist_Head a Join V_Order_Hist_Line b on a.Invoice = b.Invoice and a.Order_no = b.Order_No and a.Order_Suffix = b.Order_Suffix Where a.Invoice = '{0}' and a.Order_No = '{1}' and Order_Line <> '8000'",V.DataTable.ARDETAIL(V.Local.i).Invoice_NO!FieldValTrim,V.Local.sOrder,V.DataTable.ARDETAIL(V.Local.i).Disc_Per!FieldVal,V.Local.sSql)
+	F.Data.DataTable.CreateFromSQL("OrdHisLine","con",V.Local.sSql,True)
+	F.Intrinsic.Control.For(V.Local.iOL,0,V.DataTable.OrdHisLine.RowCount--,1)
+		F.Intrinsic.String.Build("Select Top 1 Part From V_Inventory_Mstr Where Part = '{0}'",V.DataTable.OrdHisLine(V.Local.iOL).Part!FieldValTrim,V.Local.sSql)
+		F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+		F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+			F.Intrinsic.String.Build("Select Rate*{3} From GCG_6734_SP_PRT_COMM Where Part = '{0}' and Customer = '{1}' and SP_ID = '{2}'",V.DataTable.OrdHisLine(V.Local.iOL).Part!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).SalesMan!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldValFloat,V.Local.sSql)
+			F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+			F.Intrinsic.Control.If(V.Local.sRet,<>,"")
+				F.Data.DataTable.AddRow("TempDisc","SP",V.DataTable.OrdHisLine(V.Local.iOL).Salesman!FieldValTrim,"Customer",V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,"Name",V.DataTable.ARDETAIL(V.Local.i).Cust_Name!FieldValTrim,"Disc_Amt",V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldValFloat,"Disc_Comm",V.Local.sRet.Float)
+			F.Intrinsic.Control.Else
+				F.Intrinsic.String.Build("Select Comm_Rate*{2} From Commission_Cp Where Part_No = '{0}' and Cust_No = '{1}'",V.DataTable.OrdHisLine(V.Local.iOL).Part!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldValFloat,V.Local.sSql)
+				F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+				F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+					F.Data.DataTable.AddRow("TempDisc","SP",V.DataTable.OrdHisLine(V.Local.iOL).Salesman!FieldValTrim,"Customer",V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,"Name",V.DataTable.ARDETAIL(V.Local.i).Cust_Name!FieldValTrim,"Disc_Amt",V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldValFloat,"Disc_Comm",V.Local.sRet.Float)
+				F.Intrinsic.Control.Else
+					F.Intrinsic.String.Build("Select Top 1 Commission_Rate*{2} From Commission_Rate Where SalesPerson = '{0}' and Commission_Type = '{1}'",V.DataTable.OrdHisLine(V.Local.iOL).SalesMan!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Commission_Type!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldVal,V.Local.sSql)
+					F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+						F.Data.DataTable.AddRow("TempDisc","SP",V.DataTable.OrdHisLine(V.Local.iOL).Salesman!FieldValTrim,"Customer",V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,"Name",V.DataTable.ARDETAIL(V.Local.i).Cust_Name!FieldValTrim,"Disc_Amt",V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldValFloat,"Disc_Comm",V.Local.sRet.Float)
+					F.Intrinsic.Control.EndIf
+				F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.String.Build("Select SP_ID, Name, Rate*{3} From GCG_6734_SP_PRT_COMM a Left Join Salespersons b on a.SP_ID = b.ID Where Part = '{0}' and Customer = '{1}' and SP_ID <> '{2}'",V.DataTable.OrdHisLine(V.Local.iOL).Part!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).SalesMan!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldValFloat,V.Local.sSql)
+			F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+			F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+				F.Intrinsic.String.Split(V.Local.sRet,"#$#",V.Local.sRet)
+				F.Intrinsic.Control.For(V.Local.iSP,0,V.Local.sRet.UBound,1)
+					F.Intrinsic.String.Split(V.Local.sRet(V.Local.iSP),"*!*",V.Local.sTemp)
+					F.Data.DataTable.AddRow("TempDisc","SP",V.Local.sTemp(0),"SP_Name",V.Local.sTemp(1).Trim,"Customer",V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,"Name",V.DataTable.ARDETAIL(V.Local.i).Cust_Name!FieldValTrim,"Disc_Amt",V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldValFloat,"Disc_Comm",V.Local.sTemp(2).Float)
+				F.Intrinsic.Control.Next(V.Local.iSP)
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Next(V.Local.iOL)
+	F.Data.DataTable.Close("OrdHisLine")
+F.Intrinsic.Control.Next(V.Local.i)
+
+F.Data.DataView.Create("TempDisc","Cust",22,"","")
+F.Data.DataView.ToDataTableDistinct("TempDisc","Cust","Cust","Customer*!*SP",True)
+F.Data.DataView.Close("TempDisc","Cust")
+
+F.Intrinsic.Control.For(V.Local.i,0,V.DataTable.Cust.RowCount--,1)
+	F.Intrinsic.String.Build("Customer = '{0}' and SP = '{1}'",V.DataTable.Cust(V.Local.i).Customer!FieldValTrim,V.DataTable.Cust(V.Local.i).SP!FieldValTrim,V.Local.sFilter)
+	F.Data.DataView.Create("TempDisc","Temp",22,V.Local.sFilter,"")
+	F.Data.DataView.ToDataTable("TempDisc","Temp","Dis_Value",True)
+	F.Data.DataView.Close("TempDisc","Temp")
+	F.Data.DataTable.AddExpressionColumn("Dis_Value","TAmt",Float,"SUM(Disc_Amt)")
+	F.Data.DataTable.AddExpressionColumn("Dis_Value","TComm",Float,"SUM(Disc_Comm)")
+	F.Intrinsic.Math.Mult(V.DataTable.Dis_Value(V.DataTable.Dis_Value.RowCount--).TAmt!FieldValFloat,-1,V.Local.fDiscAMt)
+	F.Intrinsic.Math.Mult(V.DataTable.Dis_Value(V.DataTable.Dis_Value.RowCount--).TComm!FieldValFloat,-1,V.Local.fComDol)
+	F.Intrinsic.Math.Add(V.Local.iNewSeq,1,V.Local.iNewSeq)
+	F.Intrinsic.String.Build("Select rtrim(Name) From SalesPersons Where ID = '{0}'",V.DataTable.Cust(V.Local.i).SP!FieldValTrim,V.Local.sSql)
+	F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sTemp)
+	F.Intrinsic.String.Format(V.Local.dEnd,"YYYYMMDD",V.Local.sRet)
+	F.Data.DataTable.AddRow("SAVEREP","Trmnl",V.Caller.Terminal,"Invoice_Number","DISC","Invoice_Date",V.Local.sRet,"REC_TYPE","1","PART","CUSTOMER DISCOUNT","RptId",V.Passed.009001,"REPORT","2","Salesman",V.DataTable.Cust(V.Local.i).SP!FieldValTrim,"Salsm_Name",V.Local.sTemp,"Cust_Num",V.DataTable.Cust(V.Local.i).Customer!FieldValTrim,"Name",V.DataTable.Dis_Value(V.DataTable.Dis_Value.RowCount--).Name!FieldValTrim,"Sales",V.Local.fDiscAMt,"Comm_Dollars",V.Local.fComDol,"TEMPSEQ",V.Local.iNewSeq)
+	F.Data.DataTable.Close("Dis_Value")
+F.Intrinsic.Control.Next(V.Local.i)
+
+F.Data.DataView.Create("SAVEREP","temp",22,"","")
+
+F.Data.DataView.ToDataTableDistinct("SAVEREP","Temp","SALESMAN","SALESMAN",True)
+
+F.Data.DataView.Close("SAVEREP","TEMP")
+
+F.Intrinsic.Control.For(V.Local.i,0,V.DataTable.SALESMAN.RowCount--,1)
+	F.Intrinsic.String.Build("SALESMAN = '{0}' and Rec_Type = '1'",V.DataTable.SALESMAN(V.Local.i).SALESMAN!FieldValTrim,V.Local.sFilter)
+	F.Data.DataView.Create("SAVEREP","temp",22,V.Local.sFilter,"Invoice_Number, Order_Number, Part")
+	V.Local.fComDol.Set(0)
+	F.Intrinsic.Control.For(V.Local.iSP,0,V.DataView.SaveRep!temp.RowCount--,1)
+'		F.Intrinsic.Math.Add(V.Local.iNewSeq,1,V.Local.iNewSeq)
+		F.Intrinsic.Math.Add(V.Local.fComDol,V.DataView.SaveRep!temp(V.Local.iSP).Comm_Dollars!FieldValFloat,V.Local.fComDol)
+		F.Intrinsic.Math.Add(V.Local.fSales,V.DataView.SaveRep!temp(V.Local.iSP).Sales!FieldValFloat,V.Local.fSales)
+'		F.Data.DataView.SetValue("SAVEREP","temp",V.Local.iSP,"TEMPSEQ",V.Local.iNewSeq)
+		F.Intrinsic.Control.If(V.DataView.SaveRep!temp.RowCount--,=,V.Local.iSP)
+			F.Intrinsic.String.Build("TEMPSEQ = {0}",V.DataView.SaveRep!temp(V.Local.iSP).TEMPSEQ!FieldVal,V.Local.sFilter)
+			F.Data.DataView.Create("SAVEREP","Rec2",22,V.Local.sFilter,"")
+			F.Data.DataView.ToDataTable("SAVEREP","Rec2","Rec2",True)
+			F.Data.DataView.Close("SAVEREP","Rec2")
+			F.Intrinsic.Math.Add(V.Local.iNewSeq,1,V.Local.iNewSeq)
+			F.Data.DataTable.SetValue("Rec2",-1,"REC_TYPE","2","Sub_Sales",V.Local.fSales,"Sub_Comm_Dollars",V.Local.fComDol,"TEMPSEQ",V.Local.iNewSeq)
+
+			F.Data.DataTable.Merge("Rec2","SAVEREP",False,2)
+			F.Data.DataTable.Close("Rec2")
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Next(V.Local.iSP)
+	F.Data.DataView.Close("SAVEREP","Temp")
+	V.Local.fSales.Set(0)
+F.Intrinsic.Control.Next(v.Local.i)
+
+F.Data.DataView.Close("REP","Temp")
+
+F.Intrinsic.Math.Add(V.Local.iNewSeq,1,V.Local.iNewSeq)
+
+F.Data.DataView.Create("SAVEREP","TOT",22,"Rec_Type = '2'","")
+F.Data.DataView.ToDataTable("SAVEREP","TOT","TOT",True)
+F.Data.DataView.Close("SAVEREP","TOT")
+F.Data.DataTable.AddExpressionColumn("TOT","TOTDOLLARS",FLOAT,"SUM(SUB_COMM_DOLLARS)")
+F.Data.DataView.Create("SAVEREP","TSALE",22,"Rec_Type = '1'","")
+F.Data.DataView.ToDataTableDISTINCT("SAVEREP","TSALE","TSALE","Invoice_Number*!*PART*!*ORDER_NUMBER*!*SALES*!*COST*!*PROFIT",True)
+F.Data.DataView.Close("SAVEREP","TSALE")
+F.Data.DataTable.AddExpressionColumn("TSALE","TOTSALES",FLOAT,"SUM(SALES)")
+F.Data.DataTable.AddExpressionColumn("TSALE","TOTCOST",FLOAT,"SUM(COST)")
+F.Data.DataTable.AddExpressionColumn("TSALE","TOTPROFIT",FLOAT,"SUM(PROFIT)")
+
+F.Intrinsic.String.Build("Select * From BI_SALES_REP_COMM  Where Trmnl = '{0}' and RptId = '{1}' and Rec_Type = '3'",V.Caller.Terminal,V.Passed.009001,V.Local.sSql)
+F.Data.DataTable.CreateFromSQL("TMerge",con,V.Local.sSql,True)
+F.Data.DataTable.AddColumn("TMerge","TEMPSEQ",Long)
+F.Data.DataTable.SetValue("TMerge",-1,"TOT_SALES",V.DataTable.TSALE(V.DataTable.TSALE.RowCount--).TOTSALES!FieldValFloat,"TOT_COMM_DOLLARS",V.DataTable.TOT(V.DataTable.TOT.RowCount--).TOTDOLLARS!FieldValFloat,"TEMPSEQ",V.Local.iNewSeq,"TOT_COST",V.DataTable.TSALE(V.DataTable.TSALE.RowCount--).TOTCOST!FieldValFloat,"TOT_PROFIT",V.DataTable.TSALE(V.DataTable.TSALE.RowCount--).TOTPROFIT!FieldValFloat)
+F.Data.DataTable.Merge("TMerge","SAVEREP",False,2)
+F.Data.DataTable.SetValue("SAVEREP",-1,"REPORT","2")
+F.Data.DataTable.Close("TMerge")
+
+F.Data.DataTable.Close("TOT")
+F.Data.DataTable.Close("TSALE")
+
+F.Data.DataView.Create("SAVEREP","Temp",22,"","TEMPSEQ")
+
+F.Intrinsic.Math.Sub(V.DataView.SAVEREP!Temp.RowCount--,1,V.Local.iNewSeq)
+F.Intrinsic.Control.For(V.Local.i,0,V.DataView.SAVEREP!Temp.RowCount--,1)
+	F.Intrinsic.Control.If(V.Local.i,=,V.Local.iNewSeq)
+		V.Local.sRet.Set(V.DataView.SAVEREP!Temp(V.Local.i).SALESMAN!FieldValTrim)
+	F.Intrinsic.Control.EndIf
+	F.Intrinsic.Math.Add(V.Local.i,1,V.Local.sSeq)
+	F.Intrinsic.String.Format(V.Local.sSeq,"000000",V.Local.sSeq)
+	F.Data.DataView.SetValue("SAVEREP","Temp",V.Local.i,"Sequence",V.Local.sSeq)
+	'setting Saleman of type 3 to last salesman in bi table this is due to how the report is grouped and sorted
+	F.Intrinsic.Control.If(V.Local.i,=,V.DataView.SAVEREP!Temp.RowCount--)
+		F.Data.DataView.SetValue("SAVEREP","Temp",V.Local.i,"SALESMAN",V.Local.sRet)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Next(V.Local.i)
+F.Data.DataView.Close("SAVEREP","Temp")
+
+F.Data.DataTable.Close("REP")
+F.Data.DataTable.Close("SALESMAN")
+F.Data.DataTable.RemoveColumn("SAVEREP","TEMPSEQ")
+
+F.Intrinsic.String.Build("Delete From BI_SALES_REP_COMM Where Trmnl = '{0}' and RptId = '{1}'",V.Caller.Terminal,V.Passed.009001,V.Local.sSql)
+F.ODBC.Connection!Con.Execute(V.Local.sSql)
+
+F.Data.DataTable.SaveToDB("SAVEREP","con","BI_SALES_REP_COMM","",128)
+
+'F.Intrinsic.String.Build("Select Cust, Cust_Name, Invoice_NO, Order_Num, Invc_Disc_OE, (Terms_Disc_Pct * .01) as Disc_Per From GL_AR_Detail a Join V_AR_Terms b on a.Terms_Code = b.Terms_Code Where Retain = '0' and Invc_Disc_OE <> 0 and Disc_Due_Date_Sql Between '{0}' and '{1}'",V.Local.dStart.PervasiveDate,V.Local.dEnd.PervasiveDate,V.Local.sSql)
+'F.Data.DataTable.CreateFromSQL("ARDETAIL","con",V.Local.sSql,True)
+'F.Data.DataTable.AddColumn("ARDETAIL","Disc_Comm",Float)
+
+'F.Intrinsic.String.Build("Delete From GCG_6749_AR_DISC Where Trmnl = '{0}' and RptId = '{1}'",V.Caller.Terminal,V.Passed.009001,V.Local.sSql)
+'F.ODBC.Connection!con.Execute(V.Local.sSql)
+
+'F.Intrinsic.String.Build("Select * From GCG_6749_AR_DISC Where Trmnl = '{0}' and RptId = '{1}'",V.Caller.Terminal,V.Passed.009001,V.Local.sSql)
+
+'F.Data.DataTable.CreateFromSQL("Disc","con",V.Local.sSql,True)
+
+'F.Data.DataTable.Create("TempDisc",True)
+'F.Data.DataTable.AddColumn("TempDisc","Customer",String)
+'F.Data.DataTable.AddColumn("TempDisc","Name",String)
+'F.Data.DataTable.AddColumn("TempDisc","Disc_Amt",Float)
+'F.Data.DataTable.AddColumn("TempDisc","Disc_Comm",Float)
+
+'F.Intrinsic.Control.For(V.Local.i,0,V.DataTable.ARDETAIL.RowCount--,1)
+'	F.Intrinsic.String.LPad(V.DataTable.ARDETAIL(V.Local.i).Order_Num!FieldValTrim,"0",7,V.Local.sOrder)
+'	F.Intrinsic.String.Build("Select Salesman, b.Commission_Type, Order_Line, Part, a.Customer, (Extension * {2}) as Disc_Amt From V_Order_Hist_Head a Join V_Order_Hist_Line b on a.Invoice = b.Invoice and a.Order_no = b.Order_No and a.Order_Suffix = b.Order_Suffix Where a.Invoice = '{0}' and a.Order_No = '{1}'",V.DataTable.ARDETAIL(V.Local.i).Invoice_NO!FieldValTrim,V.Local.sOrder,V.DataTable.ARDETAIL(V.Local.i).Disc_Per!FieldVal,V.Local.sSql)
+'	F.Data.DataTable.CreateFromSQL("OrdHisLine","con",V.Local.sSql,True)
+'	F.Intrinsic.Control.For(V.Local.iOL,0,V.DataTable.OrdHisLine.RowCount--,1)
+'		F.Intrinsic.Control.If(V.DataTable.OrdHisLine(V.Local.iOL).SalesMan!FieldValTrim,<>,"")
+'			F.Intrinsic.String.Build("Select Top 1 Part From V_Inventory_Mstr Where Part = '{0}'",V.DataTable.TEMPREP(V.Local.i).Part!FieldValTrim,V.Local.sSql)
+'			F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+'			F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+'				F.Intrinsic.String.Build("Select Rate*{3} From GCG_6734_SP_PRT_COMM Where Part = '{0}' and Customer = '{1}' and SP_ID = '{2}'",V.DataTable.OrdHisLine(V.Local.iOL).Part!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).SalesMan!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldVal,V.Local.sSql)
+'				F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+'				F.Intrinsic.Control.If(V.Local.sRet,<>,"")
+'					F.Data.DataTable.AddRow("TempDisc","Customer",V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,"Name",V.DataTable.ARDETAIL(V.Local.i).Cust_Name!FieldValTrim,"Disc_Amt",V.DataTable.ARDETAIL(V.Local.i).Invc_Disc_OE!FieldVal,"Disc_Comm",V.Local.sRet.Float)
+'				F.Intrinsic.Control.Else
+'					F.Intrinsic.String.Build("Select Rate*{3} From GCG_6734_SP_PRT_COMM Where Part = '{0}' and Customer = '{1}' and SP_ID = '{2}'",V.DataTable.OrdHisLine(V.Local.iOL).Part!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).SalesMan!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldVal,V.Local.sSql)
+'					F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+'					F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+'						F.Data.DataTable.AddRow("TempDisc","Customer",V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,"Name",V.DataTable.ARDETAIL(V.Local.i).Cust_Name!FieldValTrim,"Disc_Amt",V.DataTable.ARDETAIL(V.Local.i).Invc_Disc_OE!FieldVal,"Disc_Comm",V.Local.sRet.Float)
+'					F.Intrinsic.Control.Else
+'						F.Intrinsic.String.Build("Select Top 1 Commission_Rate*{2} From Commission_Rate Where SalesPerson = '{0}' and Commission_Type = '{1}'",V.DataTable.OrdHisLine(V.Local.iOL).SalesMan!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Commission_Type!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldVal,V.Local.sSql)
+'						F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+'							F.Data.DataTable.AddRow("TempDisc","Customer",V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,"Name",V.DataTable.ARDETAIL(V.Local.i).Cust_Name!FieldValTrim,"Disc_Amt",V.DataTable.ARDETAIL(V.Local.i).Invc_Disc_OE!FieldVal,"Disc_Comm",V.Local.sRet.Float)
+'						F.Intrinsic.Control.EndIf
+'					F.Intrinsic.Control.EndIf
+'				F.Intrinsic.Control.EndIf
+'				F.Intrinsic.String.Build("Select Rate*{3} From GCG_6734_SP_PRT_COMM Where Part = '{0}' and Customer = '{1}' and SP_ID <> '{2}'",V.DataTable.OrdHisLine(V.Local.iOL).Part!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).SalesMan!FieldValTrim,V.DataTable.OrdHisLine(V.Local.iOL).Disc_Amt!FieldVal,V.Local.sSql)
+'				F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+'				F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+'					F.Intrinsic.String.Split(V.Local.sRet,"#$#",V.Local.sRet)
+'					F.Intrinsic.Control.For(V.Local.iSP,0,V.Local.sRet.UBound,1)
+'						F.Data.DataTable.AddRow("TempDisc","Customer",V.DataTable.OrdHisLine(V.Local.iOL).Customer!FieldValTrim,"Name",V.DataTable.ARDETAIL(V.Local.i).Cust_Name!FieldValTrim,"Disc_Amt","0","Disc_Comm",V.Local.sRet(V.Local.iSP).Float)
+'					F.Intrinsic.Control.Next(V.Local.iSP)
+'				F.Intrinsic.Control.EndIf
+'			F.Intrinsic.Control.EndIf
+'		F.Intrinsic.Control.EndIf
+'	F.Intrinsic.Control.Next(V.Local.iOL)
+'	F.Data.DataTable.Close("OrdHisLine")
+'F.Intrinsic.Control.Next(V.Local.i)
+
+'F.Data.DataView.Create("TempDisc","Cust",22,"","")
+'F.Data.DataView.ToDataTableDistinct("TempDisc","Cust","Cust","Customer",True)
+'F.Data.DataView.Close("TempDisc","Cust")
+
+'F.Intrinsic.Control.For(V.Local.i,0,V.DataTable.Cust.RowCount--,1)
+'	F.Intrinsic.String.Build("Customer = '{0}'",V.DataTable.Cust(V.Local.i).Customer!FieldValTrim,V.Local.sFilter)
+'	F.Data.DataView.Create("TempDisc","Temp",22,"","")
+'	F.Data.DataView.ToDataTable("TempDisc","Temp","Dis_Value",True)
+'	F.Data.DataView.Close("TempDisc","Temp")
+'	F.Data.DataTable.AddExpressionColumn("Dis_Value","TAmt",Float,"SUM(Disc_Amt)")
+'	F.Data.DataTable.AddExpressionColumn("Dis_Value","TComm",Float,"SUM(Disc_Comm)")
+'	F.Intrinsic.Math.Mult(V.DataTable.Dis_Value(V.DataTable.Dis_Value.RowCount--).TAmt!FieldValFloat,-1,V.Local.fDiscAMt)
+'	F.Intrinsic.Math.Mult(V.DataTable.Dis_Value(V.DataTable.Dis_Value.RowCount--).TComm!FieldValFloat,-1,V.Local.fComDol)
+'	F.Data.DataTable.AddRow("Disc","Trmnl",V.Caller.Terminal,"RptId",V.Passed.009001,"Customer",V.DataTable.Cust(V.Local.i).Customer!FieldValTrim,"Name",V.DataTable.Dis_Value(V.DataTable.Dis_Value.RowCount--).Name!FieldValTrim,"Disc_Amt",V.Local.fDiscAMt,"Disc_Comm",V.Local.fComDol)
+'F.Intrinsic.Control.Next(V.Local.i)
+
+'F.Intrinsic.Control.If(V.DataTable.Disc.RowCount--,<>,-1)
+'	F.Data.DataTable.SaveToDB("Disc","con","GCG_6749_AR_DISC","",128)
+'F.Intrinsic.Control.EndIf
+
+'F.Data.DataTable.Close("Disc")
+
+F.ODBC.Connection!con.Close
+V.Global.bOpen.Set(False)
+
+F.Intrinsic.UI.CloseWaitDialog
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Update_BIData_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	F.Intrinsic.String.Build("Project: GCG_6734_AR_NETSALES_ONLY.g2u {0}{0}Subroutine: {1}{0}Error Occurred {2} with description {3}",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(Exit)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Update_BIData.End
+
+Program.Sub.Comments.Start
+${$5$}$2.0.0.0$}$2
+${$6$}$rking$}$20230227145246377$}$QNdZLVy4bWuiWa9jh1ZTiKHvMPldSPXeundXS33kXGnv/pWshTI7+0DnXjRZF/IJswSM/ymaCGk=
+Program.Sub.Comments.End
